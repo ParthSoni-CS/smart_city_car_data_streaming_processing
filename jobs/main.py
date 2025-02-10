@@ -1,0 +1,110 @@
+import os
+import uuid
+from confluent_kafka import SerializingProducer
+import simplejson as json
+from datetime import datetime, timedelta
+import random 
+
+LONDON_COORDINATES = {
+    "latitude": 51.5074,
+    "longitude": -0.1278
+}
+
+BIRMINGHAM_COORDINATES = {
+    "latitude": 52.4862,
+    "longitude": -1.8904
+}
+
+# Calculate the movement increment
+LATITUDE_INCREMENT = (BIRMINGHAM_COORDINATES["latitude"] - LONDON_COORDINATES["latitude"])/100
+LONGITUDE_INCREMENT = (BIRMINGHAM_COORDINATES["longitude"] - LONDON_COORDINATES["longitude"])/100
+
+# Environment Variables for configuration
+KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS')
+
+VEHICLE_TOPIC = os.getenv('VEHICLE_TOPIC', 'vehicle_data')
+GPS_TOPIC = os.getenv('GPS_TOPIC', 'gps_data')
+TRAFFIC_TOPIC = os.getenv('TRAFFIC_TOPIC', 'traffic_data')
+WEATHER_TOPIC = os.getenv('WEATHER_TOPIC', 'weather_data')
+EMERGENCY_TOPIC = os.getenv('EMERGENCY_TOPIC', 'emergency_data')
+
+start_time = datetime.now()
+
+start_location = LONDON_COORDINATES.copy()
+
+def get_next_time():
+    global start_time
+    start_time += timedelta(seconds=random.randint(30,60))
+    return start_time
+
+def generate_gps_data(device_id, timestamp, vehicle_type='private'):
+    return {
+        'id': uuid.uuid4(),
+        'deviceID': device_id,
+        'timestamp': timestamp,
+        'speed': random.uniform(0,40),
+        'direction': 'North-East',
+        'vehicle_type': vehicle_type
+    }
+
+def generate_traffic_camera_data(device_id, timestamp, camera_id):
+    return {
+        'id': uuid.uuid4(),
+        'deviceId': device_id,
+        'cameraId': camera_id,
+        'timestamp': timestamp,
+        'snapshot': 'Base64EncodedString'
+    }
+
+def simulate_vehicle_movement():
+    global start_location
+
+    start_location['latitude'] += LATITUDE_INCREMENT
+    start_location['longitude'] += LONGITUDE_INCREMENT
+
+    start_location['latitude'] += random.uniform(-0.0005, 0.0005)
+    start_location['longitude'] += random.uniform(-0.0005, 0.0005)
+
+    return start_location
+
+def generate_vehicle_data(vehicle_id):
+    location = simulate_vehicle_movement()
+    return {
+        'id': uuid.uuid4(),
+        'deviceId': vehicle_id,
+        'timestamp': get_next_time().isoformat(),
+        'location': (location['latitude'], location['longitude']),
+        'speed': random.uniform(10, 40),
+        'direction': 'North-East',
+        'maker': 'Prosche',
+        'model': 'C500',
+        'year': 2024,
+        'fueltype': 'Hybrid'
+    }
+
+
+
+
+def simulate_journey(producer, vehicle_id):
+    while True:
+        vehicle_data = generate_vehicle_data(vehicle_id)
+        gps_data = generate_gps_data(vehicle_id, vehicle_id['timestamp'])
+        traffic_camera_data = generate_traffic_camera_data(vehicle_id, vehicle_data['timestamp'], 'Canon200D')
+        break
+
+if __name__ == '__main__':
+    producer_config = {
+        'bootstrap.servers': KAFKA_BOOTSTRAP_SERVERS,
+        'error_cb': lambda err: print(f"Kafka Error : {err}")
+    }
+    producer = SerializingProducer(producer_config)
+
+    try:
+        simulate_journey(producer, 'Vehicle')
+    
+    except KeyboardInterrupt:
+        print('Simulation ended by user')
+    
+    except Exception as e:
+        print(f'Unexpected error : {e}')
+
