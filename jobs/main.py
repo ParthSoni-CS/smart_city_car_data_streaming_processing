@@ -91,7 +91,7 @@ def generate_weather_data(device_id, timestamp, location):
 def generate_gps_data(device_id, timestamp, vehicle_type='private'):
     return {
         'id': uuid.uuid4(),
-        'deviceID': device_id,
+        'deviceId': device_id,
         'timestamp': timestamp,
         'speed': random.uniform(0,40),
         'direction': 'North-East',
